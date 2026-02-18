@@ -1,0 +1,1 @@
+ALTER TABLE public.analysis_settings ADD COLUMN pitch_surface text NOT NULL DEFAULT 'concrete';
