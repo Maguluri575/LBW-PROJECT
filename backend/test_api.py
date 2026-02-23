@@ -1,6 +1,6 @@
 import requests
 
-url = "http://localhost:5000/analyze"
+url = "https://lbw-project.onrender.com/api/analyze"
 
 files = {
     "video": open("video1.mp4", "rb")
