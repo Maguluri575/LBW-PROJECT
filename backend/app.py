@@ -19,8 +19,22 @@ from storage import AnalysisStorage
 
 app = Flask(__name__)
 
-# Allow requests from Vercel frontend
-CORS(app, resources={r"/*": {"origins": "*"}})
+# ✅ Proper CORS Configuration (VERY IMPORTANT)
+CORS(
+    app,
+    origins=["https://lbw-project-i4r7.vercel.app"],  # 🔁 Replace if your Vercel URL is different
+    supports_credentials=True,
+    methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"]
+)
+
+# ✅ Handle Preflight Requests Explicitly
+@app.after_request
+def after_request(response):
+    response.headers.add("Access-Control-Allow-Origin", "https://lbw-project-i4r7.vercel.app")
+    response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
+    response.headers.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+    return response
 
 # ==============================
 # Configuration
@@ -41,7 +55,7 @@ storage = AnalysisStorage(RESULTS_FOLDER)
 analyzer = LBWAnalyzer()
 
 # ==============================
-# Root Route (Prevents 404)
+# Root Route
 # ==============================
 
 @app.route("/", methods=["GET"])
@@ -59,7 +73,7 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # ==============================
-# Analyze API (No Streaming)
+# Analyze API
 # ==============================
 
 @app.route('/api/analyze', methods=['POST'])
@@ -129,7 +143,7 @@ def health_check():
     })
 
 # ==============================
-# Run Server (IMPORTANT for Render)
+# Run Server (For Render)
 # ==============================
 
 if __name__ == '__main__':
