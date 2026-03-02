@@ -19,37 +19,23 @@ from storage import AnalysisStorage
 
 app = Flask(__name__)
 
-# ✅ Proper CORS Configuration (VERY IMPORTANT)
-CORS(
-    app,
-    origins=["https://lbw-project-i4r7.vercel.app"],  # 🔁 Replace if your Vercel URL is different
-    supports_credentials=True,
-    methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"]
-)
-
-# ✅ Handle Preflight Requests Explicitly
-@app.after_request
-def after_request(response):
-    response.headers.add("Access-Control-Allow-Origin", "https://lbw-project-i4r7.vercel.app")
-    response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
-    response.headers.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
-    return response
+# ✅ SIMPLE & CORRECT CORS (NO manual headers)
+CORS(app)
 
 # ==============================
 # Configuration
 # ==============================
 
-UPLOAD_FOLDER = 'uploads'
-RESULTS_FOLDER = 'results'
-ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv', 'webm'}
+UPLOAD_FOLDER = "uploads"
+RESULTS_FOLDER = "results"
+ALLOWED_EXTENSIONS = {"mp4", "avi", "mov", "mkv", "webm"}
 MAX_CONTENT_LENGTH = 500 * 1024 * 1024  # 500MB
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(RESULTS_FOLDER, exist_ok=True)
 
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 
 storage = AnalysisStorage(RESULTS_FOLDER)
 analyzer = LBWAnalyzer()
@@ -66,44 +52,56 @@ def home():
     })
 
 # ==============================
+# Health Check
+# ==============================
+
+@app.route("/api/health", methods=["GET"])
+def health_check():
+    return jsonify({
+        "status": "healthy",
+        "version": "1.0.0",
+        "opencv_version": analyzer.get_opencv_version()
+    })
+
+# ==============================
 # Utility Function
 # ==============================
 
 def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # ==============================
 # Analyze API
 # ==============================
 
-@app.route('/api/analyze', methods=['POST'])
+@app.route("/api/analyze", methods=["POST"])
 def analyze_video():
 
-    if 'video' not in request.files:
-        return jsonify({'error': 'No video file provided'}), 400
+    if "video" not in request.files:
+        return jsonify({"error": "No video file provided"}), 400
 
-    file = request.files['video']
-    file_hash = request.form.get('fileHash', '')
+    file = request.files["video"]
+    file_hash = request.form.get("fileHash", "")
 
-    if file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
 
     if not allowed_file(file.filename):
-        return jsonify({'error': 'Invalid file type'}), 400
+        return jsonify({"error": "Invalid file type"}), 400
 
     # Check cache
     if file_hash:
         existing = storage.find_by_hash(file_hash)
         if existing:
-            return jsonify({'cached': True, 'result': existing})
+            return jsonify({"cached": True, "result": existing})
 
     analysis_id = str(uuid.uuid4())
     filename = secure_filename(file.filename)
-    video_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{analysis_id}_{filename}")
+    video_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{analysis_id}_{filename}")
     file.save(video_path)
 
     try:
-        # Run analysis steps sequentially
+        # Run analysis steps
         analyzer.preprocess_video(video_path)
         analyzer.detect_ball()
         analyzer.track_ball()
@@ -130,22 +128,11 @@ def analyze_video():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ==============================
-# Health Check
-# ==============================
-
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    return jsonify({
-        "status": "healthy",
-        "version": "1.0.0",
-        "opencv_version": analyzer.get_opencv_version()
-    })
 
 # ==============================
-# Run Server (For Render)
+# Render Production Entry
 # ==============================
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host="0.0.0.0", port=port)
